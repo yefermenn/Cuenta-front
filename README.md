@@ -1,16 +1,86 @@
-# CuentaFront
+# 🍦 Plataforma de Gestión de Heladería
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.7.
+Aplicación web moderna para automatizar la venta en una heladería. Sistema intuitivo, rápido y diseñado para usuarios no técnicos en un punto de venta.
 
-## Development server
+## ✨ Características Principales
 
-To start a local development server, run:
+- 🔐 **Autenticación segura** - Login/Logout con validación
+- 📊 **Dashboard intuitivo** - Navegación clara con sidebar
+- ⏰ **Gestión de turnos** - Abrir y cerrar turnos diarios
+- 💰 **Sistema de ventas** - Registro, edición y eliminación de ventas
+- 📦 **Gestión de productos** - CRUD completo del inventario
+- 🎨 **Diseño moderno** - Interfaz limpia, responsive y profesional
+- ⚡ **Componentes reutilizables** - Botones, tablas, modales
+- 📱 **Responsive Design** - Funciona en desktop y tablet
+
+## 🚀 Inicio Rápido
+
+### Prerequisitos
+- Node.js 18+
+- npm o yarn
+
+### Instalación y Ejecución
 
 ```bash
-ng serve
+# 1. Instalar dependencias
+npm install
+
+# 2. Iniciar servidor de desarrollo
+npm start
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+La aplicación se abrirá automáticamente en `http://localhost:4200/`
+
+### Credenciales de Prueba
+- **Email**: `demo@heladeria.com`
+- **Contraseña**: Cualquier valor
+
+## 📖 Documentación
+
+Para información detallada sobre la arquitectura, componentes y cómo usar cada módulo, consulta [DOCUMENTACION.md](./DOCUMENTACION.md)
+
+### Estructura Rápida
+```
+src/app/
+├── core/              # Servicios, guards, modelos
+├── features/          # Módulos de funcionalidades
+│   ├── auth/         # Login
+│   ├── dashboard/    # Layout principal
+│   ├── turno/        # Gestión de turnos
+│   ├── venta/        # Sistema de ventas
+│   └── productos/    # Inventario
+└── shared/           # Componentes reutilizables
+```
+
+## 🎯 Módulos Principales
+
+### 1️⃣ Turno
+Gestiona el estado del turno diario:
+- Visualizar estado actual (Abierto/Cerrado)
+- Abrir nuevo turno
+- Cerrar turno con confirmación
+
+### 2️⃣ Venta
+Sistema completo de registro de ventas:
+- Tabla de ventas del turno
+- Búsqueda de productos
+- Edición y eliminación de ventas
+- Resumen de totales
+
+### 3️⃣ Productos
+Administración del inventario:
+- Crear nuevos productos
+- Editar información
+- Eliminar productos
+- Estado de disponibilidad
+
+## 🎨 Tecnologías Utilizadas
+
+- **Angular 17+** - Framework frontend
+- **TypeScript** - Lenguaje de programación
+- **RxJS** - Gestión de estado reactivo
+- **CSS3** - Estilos modernos
+- **LocalStorage** - Persistencia de datos (demo)
 
 ## Code scaffolding
 
