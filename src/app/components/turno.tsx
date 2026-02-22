@@ -53,25 +53,27 @@ export function Turno({ userEmail }: TurnoProps) {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-0 sm:px-4">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
+    <div className="max-w-3xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 lg:p-8">
         <div className="text-center">
           {/* Usuario */}
           <div className="mb-6">
-            <div className="inline-flex items-center justify-center w-16 sm:w-20 h-16 sm:h-20 bg-gray-100 rounded-full mb-4">
-              <User className="w-8 sm:w-10 h-8 sm:h-10 text-gray-600" />
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-full mb-4">
+              <User className="w-8 h-8 sm:w-10 sm:h-10 text-gray-600" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">Bienvenido</h2>
-            <p className="text-sm sm:text-base text-gray-600 truncate px-2">{userEmail}</p>
+            <h2 className="text-xl sm:text-2xl text-gray-900 mb-1">Bienvenido</h2>
+            <p className="text-sm sm:text-base text-gray-600 px-4 break-words">{userEmail}</p>
           </div>
 
           {/* Estado del turno */}
-          <div className="mb-8 flex justify-center">
-            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 rounded-lg border-2 border-gray-200">
-              <Clock className="w-5 sm:w-6 h-5 sm:h-6 text-gray-500 flex-shrink-0" />
-              <span className="text-sm sm:text-base text-gray-700 font-medium">Estado:</span>
+          <div className="mb-8">
+            <div className="inline-flex flex-col sm:flex-row items-center gap-2 sm:gap-3 px-4 sm:px-6 py-4 rounded-lg border-2 border-gray-200">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
+                <span className="text-sm sm:text-base text-gray-700 font-medium">Estado del turno:</span>
+              </div>
               <div
-                className={`inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full ${
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
                   turnoAbierto
                     ? 'bg-green-100 text-green-800 border border-green-300'
                     : 'bg-gray-100 text-gray-700 border border-gray-300'
@@ -79,13 +81,13 @@ export function Turno({ userEmail }: TurnoProps) {
               >
                 {turnoAbierto ? (
                   <>
-                    <CheckCircle className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
-                    <span className="font-semibold text-sm sm:text-base">Abierto</span>
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="font-semibold text-sm sm:text-base">Turno abierto</span>
                   </>
                 ) : (
                   <>
-                    <XCircle className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
-                    <span className="font-semibold text-sm sm:text-base">Cerrado</span>
+                    <XCircle className="w-5 h-5" />
+                    <span className="font-semibold text-sm sm:text-base">Turno cerrado</span>
                   </>
                 )}
               </div>
@@ -96,10 +98,10 @@ export function Turno({ userEmail }: TurnoProps) {
           {turnoAbierto && (
             <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-lg p-4 inline-block">
               <div className="flex items-center gap-3">
-                <DollarSign className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                <DollarSign className="w-5 h-5 text-indigo-600" />
                 <div className="text-left">
                   <div className="text-xs sm:text-sm text-gray-600">Base de caja</div>
-                  <div className="text-lg sm:text-xl font-semibold text-indigo-600">${baseCajaGuardada.toFixed(0)}</div>
+                  <div className="text-lg sm:text-xl text-indigo-600">${baseCajaGuardada.toFixed(0)}</div>
                 </div>
               </div>
             </div>
@@ -107,8 +109,8 @@ export function Turno({ userEmail }: TurnoProps) {
 
           {/* Input de base de caja */}
           {showBaseCajaInput && !turnoAbierto && (
-            <div className="mb-6 w-full max-w-sm mx-auto px-4 sm:px-0">
-              <label className="block text-sm font-medium mb-2 text-gray-700">
+            <div className="mb-6 max-w-sm mx-auto px-4">
+              <label className="block text-sm mb-2 text-gray-700">
                 Ingrese la base de caja inicial
               </label>
               <div className="relative mb-4">
@@ -119,7 +121,7 @@ export function Turno({ userEmail }: TurnoProps) {
                   min="0"
                   value={baseCaja}
                   onChange={(e) => setBaseCaja(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-base"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-lg"
                   placeholder="0"
                   autoFocus
                 />
@@ -130,13 +132,13 @@ export function Turno({ userEmail }: TurnoProps) {
                     setShowBaseCajaInput(false);
                     setBaseCaja('');
                   }}
-                  className="flex-1 px-4 py-2 text-sm sm:text-base border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                  className="flex-1 px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors active:bg-gray-100"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleAbrirTurno}
-                  className="flex-1 px-4 py-2 text-sm sm:text-base bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors"
+                  className="flex-1 px-4 py-2 sm:py-3 text-sm sm:text-base bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors active:bg-green-800"
                 >
                   Confirmar
                 </button>
@@ -149,7 +151,7 @@ export function Turno({ userEmail }: TurnoProps) {
             <>
               <button
                 onClick={turnoAbierto ? handleCerrarTurno : handleClickAbrirTurno}
-                className={`px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all duration-200 w-full sm:w-auto ${
+                className={`px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all duration-200 active:scale-95 ${
                   turnoAbierto
                     ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-lg shadow-red-200'
                     : 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white shadow-lg shadow-green-200'
@@ -159,7 +161,7 @@ export function Turno({ userEmail }: TurnoProps) {
               </button>
 
               {!turnoAbierto && (
-                <p className="mt-4 text-xs sm:text-sm text-gray-500 px-2">
+                <p className="mt-4 text-xs sm:text-sm text-gray-500 px-4">
                   Debe abrir el turno para comenzar a registrar ventas
                 </p>
               )}

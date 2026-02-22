@@ -29,19 +29,19 @@ export function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 md:p-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-full mb-4">
             <IceCream className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gray-900">Heladería POS</h1>
-          <p className="text-sm md:text-base text-gray-600">Ingrese sus credenciales para continuar</p>
+          <h1 className="text-3xl mb-2 text-gray-900">Heladería POS</h1>
+          <p className="text-gray-600">Ingrese sus credenciales para continuar</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2 text-gray-700">
+            <label htmlFor="email" className="block text-sm mb-2 text-gray-700">
               Correo electrónico
             </label>
             <div className="relative">
@@ -51,14 +51,14 @@ export function Login({ onLogin }: LoginProps) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-base md:text-sm"
+                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 placeholder="correo@ejemplo.com"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-2 text-gray-700">
+            <label htmlFor="password" className="block text-sm mb-2 text-gray-700">
               Contraseña
             </label>
             <div className="relative">
@@ -68,7 +68,7 @@ export function Login({ onLogin }: LoginProps) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-base md:text-sm"
+                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 placeholder="••••••••"
               />
             </div>
@@ -82,7 +82,7 @@ export function Login({ onLogin }: LoginProps) {
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors duration-200 font-medium text-base md:text-sm"
+            className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-medium"
           >
             Iniciar sesión
           </button>
