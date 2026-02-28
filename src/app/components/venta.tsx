@@ -10,13 +10,18 @@ interface Producto {
   precioCompra: number;
 }
 
-interface Venta {
-  id: string;
+interface ItemVenta {
   productoId: string;
   productoNombre: string;
   cantidad: number;
   precioUnitario: number;
   total: number;
+}
+
+interface Venta {
+  id: string;
+  items: ItemVenta[];
+  totalVenta: number;
   fecha: string;
 }
 
@@ -30,6 +35,7 @@ export function Venta() {
   const [cantidad, setCantidad] = useState(1);
   const [turnoAbierto, setTurnoAbierto] = useState(false);
   const [baseCaja, setBaseCaja] = useState(0);
+  const [items, setItems] = useState<ItemVenta[]>([]);
 
   useEffect(() => {
     // Cargar datos desde localStorage
@@ -61,24 +67,16 @@ export function Venta() {
   );
 
   const handleSaveVenta = () => {
-    if (!selectedProducto) {
-      alert('Por favor seleccione un producto');
+    if (items.length === 0) {
+      alert('Por favor agregue al menos un producto');
       return;
     }
 
-    if (cantidad < 1) {
-      alert('La cantidad debe ser al menos 1');
-      return;
-    }
-
-    const total = selectedProducto.precioVenta * cantidad;
+    const totalVenta = items.reduce((sum, item) => sum + item.total, 0);
     const newVenta: Venta = {
       id: editingVenta?.id || Date.now().toString(),
-      productoId: selectedProducto.id,
-      productoNombre: selectedProducto.nombre,
-      cantidad,
-      precioUnitario: selectedProducto.precioVenta,
-      total,
+      items,
+      totalVenta,
       fecha: new Date().toLocaleString('es-ES'),
     };
 
@@ -93,6 +91,36 @@ export function Venta() {
     localStorage.setItem('ventas', JSON.stringify(updatedVentas));
     
     closeModal();
+  };
+
+  const handleAddItem = () => {
+    if (!selectedProducto) {
+      alert('Por favor seleccione un producto');
+      return;
+    }
+
+    if (cantidad < 1) {
+      alert('La cantidad debe ser al menos 1');
+      return;
+    }
+
+    const total = selectedProducto.precioVenta * cantidad;
+    const newItem: ItemVenta = {
+      productoId: selectedProducto.id,
+      productoNombre: selectedProducto.nombre,
+      cantidad,
+      precioUnitario: selectedProducto.precioVenta,
+      total,
+    };
+
+    setItems([...items, newItem]);
+    setSelectedProducto(null);
+    setCantidad(1);
+    setSearchTerm('');
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
   };
 
   const handleDeleteVenta = (id: string) => {
@@ -111,9 +139,9 @@ export function Venta() {
     
     if (venta) {
       setEditingVenta(venta);
-      const producto = productos.find((p) => p.id === venta.productoId);
-      setSelectedProducto(producto || null);
-      setCantidad(venta.cantidad);
+      setItems(venta.items);
+    } else {
+      setItems([]);
     }
     setShowModal(true);
   };
@@ -124,6 +152,7 @@ export function Venta() {
     setSearchTerm('');
     setSelectedProducto(null);
     setCantidad(1);
+    setItems([]);
   };
 
   const generateExcel = () => {
@@ -131,7 +160,7 @@ export function Venta() {
     alert('Funcionalidad de exportación a Excel - En producción se generaría un archivo descargable');
   };
 
-  const totalVentas = ventas.reduce((sum, v) => sum + v.total, 0);
+  const totalVentas = ventas.reduce((sum, v) => sum + v.totalVenta, 0);
   const totalEnCaja = baseCaja + totalVentas;
 
   return (
@@ -214,35 +243,43 @@ export function Venta() {
                 </tr>
               ) : (
                 ventas.map((venta) => (
-                  <tr key={venta.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-600">{venta.fecha}</td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">{venta.productoNombre}</td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-center text-gray-900">{venta.cantidad}</td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
-                      ${venta.precioUnitario.toFixed(0)}
-                    </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
-                      ${venta.total.toFixed(0)}
-                    </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <div className="flex items-center justify-center gap-1 sm:gap-2">
-                        <button
-                          onClick={() => openModal(venta)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteVenta(venta.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                  venta.items.map((item, itemIndex) => (
+                    <tr key={`${venta.id}-${itemIndex}`} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-600">
+                        {itemIndex === 0 ? venta.fecha : ''}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">{item.productoNombre}</td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-center text-gray-900">{item.cantidad}</td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
+                        ${item.precioUnitario.toFixed(0)}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
+                        ${item.total.toFixed(0)}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                        <div className="flex items-center justify-center gap-1 sm:gap-2">
+                          {itemIndex === 0 && (
+                            <>
+                              <button
+                                onClick={() => openModal(venta)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
+                                title="Editar"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteVenta(venta.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 ))
               )}
             </tbody>
@@ -321,25 +358,74 @@ export function Venta() {
               )}
 
               {/* Cantidad */}
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">Cantidad</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={cantidad}
-                  onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                />
-              </div>
+              {selectedProducto && (
+                <div>
+                  <label className="block text-sm mb-2 text-gray-700">Cantidad</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={cantidad}
+                    onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  />
+                </div>
+              )}
 
-              {/* Total */}
+              {/* Botón Añadir Item */}
+              {selectedProducto && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddItem}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Añadir item
+                  </button>
+                </div>
+              )}
+
+              {/* Total del item actual */}
               {selectedProducto && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-700">Total:</span>
+                    <span className="text-gray-700">Subtotal item:</span>
                     <span className="text-xl text-indigo-600">
                       ${(selectedProducto.precioVenta * cantidad).toFixed(0)}
                     </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de items agregados */}
+              {items.length > 0 && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Items agregados ({items.length})</h3>
+                  <div className="space-y-2">
+                    {items.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">{item.productoNombre}</div>
+                          <div className="text-xs text-gray-600">Cant: {item.cantidad} × ${item.precioUnitario.toFixed(0)} = ${item.total.toFixed(0)}</div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveItem(index)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2"
+                          title="Eliminar item"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total de la venta */}
+                  <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-700 font-semibold">Total Venta:</span>
+                      <span className="text-2xl text-indigo-600 font-bold">
+                        ${items.reduce((sum, item) => sum + item.total, 0).toFixed(0)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -354,7 +440,8 @@ export function Venta() {
               </button>
               <button
                 onClick={handleSaveVenta}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                disabled={items.length === 0}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Guardar venta
               </button>
