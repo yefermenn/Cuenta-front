@@ -57,15 +57,6 @@ export function Productos() {
       });
       setProductos(migrated);
       localStorage.setItem('productos', JSON.stringify(migrated));
-    } else {
-      // Datos de ejemplo iniciales
-      const ejemplos = [
-        { id: '1', nombre: 'Helado de Vainilla', codigo: 'HEL-001', precioCompra: 2000, precioVenta: 3500 },
-        { id: '2', nombre: 'Helado de Chocolate', codigo: 'HEL-002', precioCompra: 2200, precioVenta: 3500 },
-        { id: '3', nombre: 'Helado de Fresa', codigo: 'HEL-003', precioCompra: 2100, precioVenta: 3500 },
-      ];
-      setProductos(ejemplos);
-      localStorage.setItem('productos', JSON.stringify(ejemplos));
     }
   }, []);
 
