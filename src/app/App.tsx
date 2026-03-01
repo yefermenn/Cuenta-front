@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SalesProvider } from './hooks/useSales';
 import { Login } from '@/app/components/login';
 import { Sidebar } from '@/app/components/sidebar';
 import { MobileHeader } from '@/app/components/mobile-header';
@@ -11,7 +12,7 @@ type Module = 'turno' | 'venta' | 'productos' | 'cuentas';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
   const [activeModule, setActiveModule] = useState<Module>('turno');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -21,21 +22,29 @@ export default function App() {
     if (savedSession) {
       const session = JSON.parse(savedSession);
       setIsAuthenticated(true);
-      setUserEmail(session.email);
+      setUserName(session.nombre ?? session.name ?? session.email ?? '');
     }
   }, []);
 
   const handleLogin = (email: string) => {
     setIsAuthenticated(true);
-    setUserEmail(email);
-    localStorage.setItem('userSession', JSON.stringify({ email }));
+    const savedSession = localStorage.getItem('userSession');
+    if (savedSession) {
+      const session = JSON.parse(savedSession);
+      setUserName(session.nombre ?? session.name ?? session.email ?? email);
+    } else {
+      setUserName(email);
+      localStorage.setItem('userSession', JSON.stringify({ email }));
+    }
   };
 
   const handleLogout = () => {
     if (confirm('¿Está seguro de cerrar sesión?')) {
       setIsAuthenticated(false);
-      setUserEmail('');
+      setUserName('');
       localStorage.removeItem('userSession');
+      localStorage.removeItem('user');
+      localStorage.removeItem('jwt');
       setActiveModule('turno');
     }
   };
@@ -55,12 +64,13 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <SalesProvider>
+      <div className="flex h-screen bg-gray-50">
       <Sidebar
         activeModule={activeModule}
         onModuleChange={setActiveModule}
         onLogout={handleLogout}
-        userEmail={userEmail}
+        userName={userName}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
@@ -73,7 +83,7 @@ export default function App() {
         
         <div className="flex-1 overflow-auto pt-14 lg:pt-0">
           <div className="p-4 sm:p-6 lg:p-8">
-            {activeModule === 'turno' && <Turno userEmail={userEmail} />}
+            {activeModule === 'turno' && <Turno userName={userName} />}
             {activeModule === 'venta' && <Venta />}
             {activeModule === 'productos' && <Productos />}
             {activeModule === 'cuentas' && <Cuentas />}
@@ -81,5 +91,6 @@ export default function App() {
         </div>
       </main>
     </div>
+    </SalesProvider>
   );
 }

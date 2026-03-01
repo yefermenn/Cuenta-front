@@ -17,18 +17,39 @@ export function Productos() {
   const [codigo, setCodigo] = useState('');
   const [precioCompra, setPrecioCompra] = useState('');
   const [precioVenta, setPrecioVenta] = useState('');
+  const [inventario, setInventario] = useState('0');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Cargar productos desde localStorage
+    // Priorizar productos que vienen en la sesión (`localStorage.user`)
+    const rawUser = localStorage.getItem('user');
+    if (rawUser) {
+      try {
+        const user = JSON.parse(rawUser);
+        if (Array.isArray(user.products) && user.products.length > 0) {
+          const mapped = user.products.map((p: any) => ({
+            id: String(p.id),
+            nombre: p.nombre,
+            codigo: String(p.codigo),
+            precioCompra: Number(p.precioCompra),
+            precioVenta: Number(p.precioVenta),
+          }));
+          setProductos(mapped);
+          localStorage.setItem('productos', JSON.stringify(mapped));
+          return;
+        }
+      } catch {}
+    }
+
+    // Fallback a productos guardados localmente
     const savedProductos = localStorage.getItem('productos');
     if (savedProductos) {
       const parsed = JSON.parse(savedProductos);
-      // Migrar datos antiguos si es necesario
       const migrated = parsed.map((p: any) => {
         if (!p.precioCompra && p.precio) {
           return {
             ...p,
-            precioCompra: Math.round(p.precio * 0.6), // Asume 40% de margen
+            precioCompra: Math.round(p.precio * 0.6),
             precioVenta: p.precio,
           };
         }
@@ -37,7 +58,7 @@ export function Productos() {
       setProductos(migrated);
       localStorage.setItem('productos', JSON.stringify(migrated));
     } else {
-      // Datos de ejemplo iniciales con precios de compra y venta
+      // Datos de ejemplo iniciales
       const ejemplos = [
         { id: '1', nombre: 'Helado de Vainilla', codigo: 'HEL-001', precioCompra: 2000, precioVenta: 3500 },
         { id: '2', nombre: 'Helado de Chocolate', codigo: 'HEL-002', precioCompra: 2200, precioVenta: 3500 },
@@ -49,7 +70,7 @@ export function Productos() {
   }, []);
 
   const handleSaveProducto = () => {
-    if (!nombre.trim() || !codigo.trim() || !precioCompra || !precioVenta) {
+    if (!nombre.trim() || !codigo.trim() || !precioCompra || !precioVenta || inventario === '') {
       alert('Por favor complete todos los campos');
       return;
     }
@@ -79,31 +100,180 @@ export function Productos() {
       precioCompra: precioCompraNum,
       precioVenta: precioVentaNum,
     };
-
     let updatedProductos;
     if (editingProducto) {
-      updatedProductos = productos.map((p) => (p.id === editingProducto.id ? newProducto : p));
-    } else {
-      // Verificar que no exista el código
-      if (productos.some((p) => p.codigo === newProducto.codigo)) {
-        alert('Ya existe un producto con ese código');
-        return;
-      }
-      updatedProductos = [...productos, newProducto];
+      // Actualizar en backend
+      (async () => {
+        setSaving(true);
+        try {
+          const rawUser = localStorage.getItem('user');
+          const token = localStorage.getItem('jwt');
+          if (!rawUser || !token) throw new Error('No hay sesión activa');
+          const user = JSON.parse(rawUser);
+          const userId = user?.id || user?.Id || user?.userId;
+          if (!userId) throw new Error('ID de usuario no disponible');
+
+          const payload = {
+            nombre: newProducto.nombre,
+            precioCompra: newProducto.precioCompra,
+            precioVenta: newProducto.precioVenta,
+            codigo: isNaN(Number(newProducto.codigo)) ? newProducto.codigo : Number(newProducto.codigo),
+            inventario: Number(inventario) || 0,
+            userId,
+          };
+
+          const res = await fetch(`http://localhost:3000/products/${editingProducto.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.message || err?.error || 'Error actualizando producto');
+          }
+
+          const updated = await res.json().catch(() => null);
+          const updatedItem = updated?.detail ?? updated?.product ?? updated ?? null;
+
+          const toUpdate: Producto = {
+            id: String(updatedItem?.id ?? editingProducto.id),
+            nombre: updatedItem?.nombre ?? newProducto.nombre,
+            codigo: String(updatedItem?.codigo ?? newProducto.codigo),
+            precioCompra: Number(updatedItem?.precioCompra ?? newProducto.precioCompra),
+            precioVenta: Number(updatedItem?.precioVenta ?? newProducto.precioVenta),
+          };
+
+          const updatedProductosLocal = productos.map((p) => (p.id === editingProducto.id ? toUpdate : p));
+          setProductos(updatedProductosLocal);
+          localStorage.setItem('productos', JSON.stringify(updatedProductosLocal));
+
+          // actualizar user.products si existe
+          try {
+            const rawUser2 = localStorage.getItem('user');
+            if (rawUser2) {
+              const u = JSON.parse(rawUser2);
+              if (Array.isArray(u.products)) {
+                u.products = u.products.map((p: any) => (String(p.id) === String(editingProducto.id) ? { ...p, nombre: toUpdate.nombre, codigo: toUpdate.codigo, precioCompra: toUpdate.precioCompra, precioVenta: toUpdate.precioVenta, inventario: Number(inventario) } : p));
+                localStorage.setItem('user', JSON.stringify(u));
+                localStorage.setItem('userSession', JSON.stringify(u));
+              }
+            }
+          } catch {}
+
+          closeModal();
+        } catch (err: any) {
+          alert(err?.message || 'Error al actualizar producto');
+        } finally {
+          setSaving(false);
+        }
+      })();
+      return;
     }
 
-    setProductos(updatedProductos);
-    localStorage.setItem('productos', JSON.stringify(updatedProductos));
-    
-    closeModal();
+    // Crear en el backend usando jwt y userId
+    (async () => {
+      setSaving(true);
+      try {
+        const rawUser = localStorage.getItem('user');
+        const token = localStorage.getItem('jwt');
+        if (!rawUser || !token) throw new Error('No hay sesión activa');
+        const user = JSON.parse(rawUser);
+        const userId = user?.id || user?.Id || user?.userId;
+        if (!userId) throw new Error('ID de usuario no disponible');
+
+        if (productos.some((p) => p.codigo === newProducto.codigo)) {
+          alert('Ya existe un producto con ese código');
+          setSaving(false);
+          return;
+        }
+
+        const payload = {
+          nombre: newProducto.nombre,
+          precioCompra: newProducto.precioCompra,
+          precioVenta: newProducto.precioVenta,
+          codigo: isNaN(Number(newProducto.codigo)) ? newProducto.codigo : Number(newProducto.codigo),
+          inventario: Number(inventario) || 0,
+          userId,
+        };
+
+        const res = await fetch('http://localhost:3000/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.message || err?.error || 'Error creando producto');
+        }
+
+        const created = await res.json().catch(() => null);
+        const createdItem = created?.detail ?? created?.product ?? created ?? null;
+        const toInsert: Producto = {
+          id: String(createdItem?.id ?? Date.now().toString()),
+          nombre: createdItem?.nombre ?? newProducto.nombre,
+          codigo: String(createdItem?.codigo ?? newProducto.codigo),
+          precioCompra: Number(createdItem?.precioCompra ?? newProducto.precioCompra),
+          precioVenta: Number(createdItem?.precioVenta ?? newProducto.precioVenta),
+        };
+
+        updatedProductos = [...productos, toInsert];
+        setProductos(updatedProductos);
+        localStorage.setItem('productos', JSON.stringify(updatedProductos));
+        closeModal();
+      } catch (err: any) {
+        alert(err?.message || 'Error al crear producto');
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const handleDeleteProducto = (id: string) => {
-    if (confirm('¿Está seguro de eliminar este producto?')) {
-      const updatedProductos = productos.filter((p) => p.id !== id);
-      setProductos(updatedProductos);
-      localStorage.setItem('productos', JSON.stringify(updatedProductos));
+    if (!confirm('¿Está seguro de eliminar este producto?')) {
+      return;
     }
+    (async () => {
+      try {
+        const token = localStorage.getItem('jwt');
+        if (!token) throw new Error('No hay sesión activa');
+        const res = await fetch(`http://localhost:3000/products/${id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.message || err?.error || 'Error eliminando producto');
+        }
+        // actualizar listado local
+        const updatedProductos = productos.filter((p) => p.id !== id);
+        setProductos(updatedProductos);
+        localStorage.setItem('productos', JSON.stringify(updatedProductos));
+        // también actualizar en user.products si existe
+        try {
+          const rawUser = localStorage.getItem('user');
+          if (rawUser) {
+            const u = JSON.parse(rawUser);
+            if (Array.isArray(u.products)) {
+              u.products = u.products.filter((p: any) => String(p.id) !== String(id));
+              localStorage.setItem('user', JSON.stringify(u));
+              localStorage.setItem('userSession', JSON.stringify(u));
+            }
+          }
+        } catch {}
+      } catch (err: any) {
+        alert(err?.message || 'Error al eliminar producto');
+      }
+    })();
   };
 
   const openModal = (producto?: Producto) => {
@@ -113,6 +283,9 @@ export function Productos() {
       setCodigo(producto.codigo);
       setPrecioCompra(producto.precioCompra.toString());
       setPrecioVenta(producto.precioVenta.toString());
+      // Try to populate inventory if available
+      // @ts-ignore
+      setInventario(producto.inventario != null ? String(producto.inventario) : '0');
     }
     setShowModal(true);
   };
@@ -124,6 +297,7 @@ export function Productos() {
     setCodigo('');
     setPrecioCompra('');
     setPrecioVenta('');
+    setInventario('0');
   };
 
   const generateExcel = () => {
@@ -332,6 +506,24 @@ export function Productos() {
                     <p className="text-xs text-green-700 mt-1">Precio al público</p>
                   </div>
 
+                  {/* Inventario */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-900">
+                      <span className="inline-block w-2 h-2 rounded-full bg-gray-500"></span>
+                      Inventario
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={inventario}
+                      onChange={(e) => setInventario(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-white"
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-gray-600 mt-1">Cantidad inicial en inventario</p>
+                  </div>
+
                   {/* Preview de Ganancia */}
                   {precioCompra && precioVenta && parseFloat(precioVenta) > parseFloat(precioCompra) && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -364,9 +556,10 @@ export function Productos() {
               </button>
               <button
                 onClick={handleSaveProducto}
-                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors font-medium"
+                disabled={saving}
+                className={`flex-1 px-4 py-2.5 rounded-lg transition-colors font-medium ${saving ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800'}`}
               >
-                Guardar
+                {saving ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </div>

@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
-import { User, Clock, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import { User, Clock, CheckCircle, XCircle, DollarSign, X } from 'lucide-react';
+import { useSales } from '../hooks/useSales';
 
 interface TurnoProps {
-  userEmail: string;
+  userName?: string;
 }
 
-export function Turno({ userEmail }: TurnoProps) {
+export function Turno({ userName }: TurnoProps) {
+  const { ventas } = useSales();
   const [turnoAbierto, setTurnoAbierto] = useState(false);
   const [baseCaja, setBaseCaja] = useState('');
   const [baseCajaGuardada, setBaseCajaGuardada] = useState(0);
   const [showBaseCajaInput, setShowBaseCajaInput] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [showCierreModal, setShowCierreModal] = useState(false);
 
   useEffect(() => {
     // Cargar estado del turno desde localStorage
@@ -22,31 +26,108 @@ export function Turno({ userEmail }: TurnoProps) {
       setBaseCajaGuardada(parseFloat(savedBaseCaja));
     }
   }, []);
+  const patchUser = async (payload: { shift?: boolean; base?: number }) => {
+    const rawUser = localStorage.getItem('user');
+    const token = localStorage.getItem('jwt');
+    if (!rawUser || !token) throw new Error('No hay sesión activa');
+    const user = JSON.parse(rawUser);
+    const userId = user?.id || user?.Id || user?.userId;
+    if (!userId) throw new Error('ID de usuario no disponible');
 
-  const handleAbrirTurno = () => {
+    const res = await fetch(`http://localhost:3000/users/${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const message = err?.message || err?.error || 'Error actualizando usuario';
+      throw new Error(message);
+    }
+
+    const updated = await res.json().catch(() => null);
+    if (updated) {
+      // si backend devuelve usuario actualizado, lo guardamos
+      try {
+        const newUser = updated.detail ?? updated.user ?? updated;
+        if (newUser) {
+          localStorage.setItem('user', JSON.stringify(newUser));
+          localStorage.setItem('userSession', JSON.stringify(newUser));
+        }
+      } catch {}
+    }
+    return updated;
+  };
+
+  const handleAbrirTurno = async () => {
     if (!baseCaja || parseFloat(baseCaja) < 0) {
       alert('Ingrese una base de caja válida');
       return;
     }
-    
     const baseNum = parseFloat(baseCaja);
-    setTurnoAbierto(true);
-    setBaseCajaGuardada(baseNum);
-    localStorage.setItem('turnoAbierto', JSON.stringify(true));
-    localStorage.setItem('baseCaja', baseNum.toString());
-    setShowBaseCajaInput(false);
-    setBaseCaja('');
+    setProcessing(true);
+    try {
+      await patchUser({ shift: true, base: baseNum });
+      setTurnoAbierto(true);
+      setBaseCajaGuardada(baseNum);
+      localStorage.setItem('turnoAbierto', JSON.stringify(true));
+      localStorage.setItem('baseCaja', baseNum.toString());
+      setShowBaseCajaInput(false);
+      setBaseCaja('');
+    } catch (err: any) {
+      alert(err?.message || 'Error al abrir turno');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleCerrarTurno = () => {
-    if (confirm('¿Está seguro de cerrar el turno? Se borrarán todas las ventas y la base de caja volverá a 0.')) {
+    setShowCierreModal(true);
+  };
+
+  const handleConfirmarCierre = async () => {
+    setProcessing(true);
+    try {
+      await patchUser({ shift: false, base: 0 });
       setTurnoAbierto(false);
       setBaseCajaGuardada(0);
       localStorage.setItem('turnoAbierto', JSON.stringify(false));
       localStorage.removeItem('baseCaja');
       localStorage.removeItem('ventas');
+      setShowCierreModal(false);
+    } catch (err: any) {
+      alert(err?.message || 'Error al cerrar turno');
+    } finally {
+      setProcessing(false);
     }
   };
+
+  // Obtener la fecha de hoy sin hora para filtrar ventas del día
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  // Filtrar ventas del día de hoy
+  const ventasHoy = ventas.filter((venta) => {
+    const ventaDate = new Date(venta.rawFecha);
+    return ventaDate >= todayStart && ventaDate <= todayEnd;
+  });
+
+  // Calcular totales
+  const totalVentasEfectivo = ventasHoy
+    .filter((v) => v.metodo_pago === 'efectivo')
+    .reduce((sum, v) => sum + v.totalVenta, 0);
+  
+  const totalVentasNequi = ventasHoy
+    .filter((v) => v.metodo_pago === 'nequi')
+    .reduce((sum, v) => sum + v.totalVenta, 0);
+
+  const totalEnCaja = baseCajaGuardada + totalVentasEfectivo;
 
   const handleClickAbrirTurno = () => {
     setShowBaseCajaInput(true);
@@ -62,7 +143,7 @@ export function Turno({ userEmail }: TurnoProps) {
               <User className="w-8 h-8 sm:w-10 sm:h-10 text-gray-600" />
             </div>
             <h2 className="text-xl sm:text-2xl text-gray-900 mb-1">Bienvenido</h2>
-            <p className="text-sm sm:text-base text-gray-600 px-4 break-words">{userEmail}</p>
+            <p className="text-sm sm:text-base text-gray-600 px-4 break-words">{userName || ''}</p>
           </div>
 
           {/* Estado del turno */}
@@ -151,13 +232,14 @@ export function Turno({ userEmail }: TurnoProps) {
             <>
               <button
                 onClick={turnoAbierto ? handleCerrarTurno : handleClickAbrirTurno}
+                disabled={processing}
                 className={`px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all duration-200 active:scale-95 ${
                   turnoAbierto
                     ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-lg shadow-red-200'
                     : 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white shadow-lg shadow-green-200'
-                }`}
+                } ${processing ? 'opacity-70 cursor-wait' : ''}`}
               >
-                {turnoAbierto ? 'Cerrar turno' : 'Abrir turno'}
+                {processing ? 'Procesando...' : turnoAbierto ? 'Cerrar turno' : 'Abrir turno'}
               </button>
 
               {!turnoAbierto && (
@@ -169,6 +251,67 @@ export function Turno({ userEmail }: TurnoProps) {
           )}
         </div>
       </div>
+
+      {/* Modal de cierre de turno */}
+      {showCierreModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Cierre de Turno</h2>
+              <button
+                onClick={() => setShowCierreModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Total en caja */}
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Total en caja</label>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <p className="text-2xl font-bold text-green-600">{totalEnCaja.toFixed(0)}</p>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Base ({baseCajaGuardada.toFixed(0)}) + Efectivo ({totalVentasEfectivo.toFixed(0)})
+                  </p>
+                </div>
+              </div>
+
+              {/* Total en Nequi */}
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Total de ventas en Nequi</label>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
+                    <p className="text-2xl font-bold text-blue-600">{totalVentasNequi.toFixed(0)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones */}
+              <div className="pt-6 flex gap-3">
+                <button
+                  onClick={() => setShowCierreModal(false)}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmarCierre}
+                  disabled={processing}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-70"
+                >
+                  {processing ? 'Cerrando...' : 'Cerrar turno'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

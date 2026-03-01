@@ -6,12 +6,12 @@ interface SidebarProps {
   activeModule: Module;
   onModuleChange: (module: Module) => void;
   onLogout: () => void;
-  userEmail: string;
+  userName?: string;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-export function Sidebar({ activeModule, onModuleChange, onLogout, userEmail, isOpen = true, onClose }: SidebarProps) {
+export function Sidebar({ activeModule, onModuleChange, onLogout, userName, isOpen = true, onClose }: SidebarProps) {
   const menuItems: { id: Module; label: string; icon: React.ReactNode }[] = [
     { id: 'turno', label: 'Turno', icon: <Clock className="w-5 h-5" /> },
     { id: 'venta', label: 'Venta', icon: <ShoppingCart className="w-5 h-5" /> },
@@ -64,7 +64,7 @@ export function Sidebar({ activeModule, onModuleChange, onLogout, userEmail, isO
               </button>
             )}
           </div>
-          <div className="text-sm text-gray-400 truncate">{userEmail}</div>
+          <div className="text-sm text-gray-400 truncate">{userName || ''}</div>
         </div>
 
         {/* Menu Items */}

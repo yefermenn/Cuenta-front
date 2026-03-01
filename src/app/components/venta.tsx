@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSales } from '../hooks/useSales';
 import { Plus, FileSpreadsheet, Edit, Trash2, Search, X, DollarSign } from 'lucide-react';
 
 interface Producto {
@@ -11,6 +12,7 @@ interface Producto {
 }
 
 interface ItemVenta {
+  saleDetailId?: string;
   productoId: string;
   productoNombre: string;
   cantidad: number;
@@ -26,7 +28,7 @@ interface Venta {
 }
 
 export function Venta() {
-  const [ventas, setVentas] = useState<Venta[]>([]);
+  const { ventas, refreshSales } = useSales();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingVenta, setEditingVenta] = useState<Venta | null>(null);
@@ -36,18 +38,45 @@ export function Venta() {
   const [turnoAbierto, setTurnoAbierto] = useState(false);
   const [baseCaja, setBaseCaja] = useState(0);
   const [items, setItems] = useState<ItemVenta[]>([]);
+  const [metodoPago, setMetodoPago] = useState('efectivo');
+
+  // states for inline item editing
+  const [itemEditingIdx, setItemEditingIdx] = useState<number | null>(null);
+  const [itemEditCantidad, setItemEditCantidad] = useState(1);
+  const [itemEditSearchTerm, setItemEditSearchTerm] = useState('');
+  const [itemEditSelectedProducto, setItemEditSelectedProducto] = useState<Producto | null>(null);
 
   useEffect(() => {
     // Cargar datos desde localStorage
-    const savedVentas = localStorage.getItem('ventas');
     const savedProductos = localStorage.getItem('productos');
     const savedTurno = localStorage.getItem('turnoAbierto');
     const savedBaseCaja = localStorage.getItem('baseCaja');
-    
-    if (savedVentas) setVentas(JSON.parse(savedVentas));
+    const savedUser = localStorage.getItem('user');
+
+    // Cargar user info y mapear productos (ventas ahora vienen del SalesProvider)
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+
+        if (Array.isArray(user.products)) {
+          const productsFromUser = user.products.map((p: any) => ({
+            id: p.id,
+            nombre: p.nombre,
+            codigo: p.codigo,
+            precio: p.precioVenta,
+            precioVenta: p.precioVenta,
+            precioCompra: p.precioCompra,
+          }));
+          setProductos(productsFromUser);
+        }
+      } catch {
+        // si el parsing falla, simplemente ignorar
+      }
+    }
+
+    // También cargar productos guardados localmente si existen (para casos antiguos)
     if (savedProductos) {
       const parsed = JSON.parse(savedProductos);
-      // Migrar productos antiguos si es necesario
       const migrated = parsed.map((p: any) => {
         if (!p.precioVenta && p.precio) {
           return { ...p, precioCompra: p.precio * 0.6, precioVenta: p.precio };
@@ -66,31 +95,133 @@ export function Venta() {
       p.codigo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSaveVenta = () => {
+  const handleSaveVenta = async () => {
     if (items.length === 0) {
       alert('Por favor agregue al menos un producto');
       return;
     }
 
-    const totalVenta = items.reduce((sum, item) => sum + item.total, 0);
-    const newVenta: Venta = {
-      id: editingVenta?.id || Date.now().toString(),
-      items,
-      totalVenta,
-      fecha: new Date().toLocaleString('es-ES'),
-    };
+    try {
+      const savedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('jwt');
 
-    let updatedVentas;
-    if (editingVenta) {
-      updatedVentas = ventas.map((v) => (v.id === editingVenta.id ? newVenta : v));
-    } else {
-      updatedVentas = [...ventas, newVenta];
+      if (!savedUser || !token) {
+        alert('Error: Usuario no autenticado');
+        return;
+      }
+
+      const user = JSON.parse(savedUser);
+      const userId = user.id;
+
+      // Si es edición (editingVenta existe), hacer PATCH
+      if (editingVenta) {
+        const patchPayload = {
+          estado: 'pagada',
+          metodo_pago: metodoPago,
+          items: items.map((item) => {
+            const itemPayload: any = {
+              cantidad: item.cantidad,
+            };
+            // Si el item tiene saleDetailId, es un detalle existente
+            if (item.saleDetailId) {
+              itemPayload.id = item.saleDetailId;
+              // también enviar productId para permitir cambios de producto
+              itemPayload.productId = parseInt(item.productoId, 10);
+            } else {
+              // Si no tiene ID, es un nuevo detalle
+              itemPayload.productId = parseInt(item.productoId, 10);
+            }
+            return itemPayload;
+          }),
+        };
+
+        const response = await fetch(`http://localhost:3000/sales/${editingVenta.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(patchPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Error al actualizar la venta');
+        }
+
+        const responseData = await response.json();
+
+        // Mapear la respuesta para actualizar el estado local
+        const updatedVenta: Venta = {
+          id: responseData.id,
+          items: Array.isArray(responseData.saleDetails)
+            ? responseData.saleDetails.map((detail: any) => ({
+                saleDetailId: detail.id,
+                productoId: String(detail.productId),
+                productoNombre: detail.product?.nombre || 'Desconocido',
+                cantidad: detail.cantidad,
+                precioUnitario: parseFloat(detail.precio_unitario),
+                total: parseFloat(detail.subtotal),
+              }))
+            : [],
+          totalVenta: parseFloat(responseData.total_venta),
+          fecha: new Date(responseData.fecha).toLocaleString('es-ES'),
+        };
+
+        await refreshSales();
+        alert('Venta actualizada correctamente');
+        closeModal();
+      } else {
+        // Si es nueva venta, hacer POST
+        const postPayload = {
+          userId,
+          metodo_pago: metodoPago,
+          items: items.map((item) => ({
+            productId: parseInt(item.productoId, 10),
+            cantidad: item.cantidad,
+          })),
+        };
+
+        const response = await fetch('http://localhost:3000/sales', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(postPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Error al guardar la venta');
+        }
+
+        const responseData = await response.json();
+
+        // Mapear la respuesta para agregar a ventas
+        const newVenta: Venta = {
+          id: responseData.id,
+          items: Array.isArray(responseData.saleDetails)
+            ? responseData.saleDetails.map((detail: any) => ({
+                saleDetailId: detail.id,
+                productoId: String(detail.productId),
+                productoNombre: detail.product?.nombre || 'Desconocido',
+                cantidad: detail.cantidad,
+                precioUnitario: parseFloat(detail.precio_unitario),
+                total: parseFloat(detail.subtotal),
+              }))
+            : [],
+          totalVenta: parseFloat(responseData.total_venta),
+          fecha: new Date(responseData.fecha).toLocaleString('es-ES'),
+        };
+
+        await refreshSales();
+        alert('Venta guardada correctamente');
+        closeModal();
+      }
+    } catch (error) {
+      alert(`Error: ${error instanceof Error ? error.message : 'Error desconocido al guardar la venta'}`);
     }
-
-    setVentas(updatedVentas);
-    localStorage.setItem('ventas', JSON.stringify(updatedVentas));
-    
-    closeModal();
   };
 
   const handleAddItem = () => {
@@ -123,11 +254,51 @@ export function Venta() {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleDeleteVenta = (id: string) => {
-    if (confirm('¿Está seguro de eliminar esta venta?')) {
-      const updatedVentas = ventas.filter((v) => v.id !== id);
-      setVentas(updatedVentas);
-      localStorage.setItem('ventas', JSON.stringify(updatedVentas));
+  const openItemEditor = (index: number) => {
+    const it = items[index];
+    setItemEditingIdx(index);
+    setItemEditCantidad(it.cantidad);
+    setItemEditSearchTerm('');
+    // preload producto for dropdown if exists
+    const prod = productos.find((p) => p.id === it.productoId);
+    setItemEditSelectedProducto(prod || null);
+  };
+
+  const closeItemEditor = () => {
+    setItemEditingIdx(null);
+    setItemEditCantidad(1);
+    setItemEditSearchTerm('');
+    setItemEditSelectedProducto(null);
+  };
+
+  const saveItemEdit = () => {
+    if (itemEditingIdx === null) return;
+    const updated: ItemVenta = {
+      ...items[itemEditingIdx],
+      cantidad: itemEditCantidad,
+      productoId: itemEditSelectedProducto ? itemEditSelectedProducto.id : items[itemEditingIdx].productoId,
+      productoNombre: itemEditSelectedProducto ? itemEditSelectedProducto.nombre : items[itemEditingIdx].productoNombre,
+      precioUnitario: itemEditSelectedProducto ? itemEditSelectedProducto.precioVenta : items[itemEditingIdx].precioUnitario,
+      total: (itemEditSelectedProducto ? itemEditSelectedProducto.precioVenta : items[itemEditingIdx].precioUnitario) * itemEditCantidad,
+    };
+    const newItems = [...items];
+    newItems[itemEditingIdx] = updated;
+    setItems(newItems);
+    closeItemEditor();
+  };
+
+  const handleDeleteVenta = async (id: string) => {
+    if (!confirm('¿Está seguro de eliminar esta venta?')) return;
+    try {
+      const token = localStorage.getItem('jwt');
+      await fetch(`http://localhost:3000/sales/${id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    } catch (e) {
+      // ignorar errores del delete y refrescar para mantener consistencia
+    } finally {
+      await refreshSales();
     }
   };
 
@@ -153,6 +324,7 @@ export function Venta() {
     setSelectedProducto(null);
     setCantidad(1);
     setItems([]);
+    setMetodoPago('efectivo');
   };
 
   const generateExcel = () => {
@@ -160,8 +332,25 @@ export function Venta() {
     alert('Funcionalidad de exportación a Excel - En producción se generaría un archivo descargable');
   };
 
-  const totalVentas = ventas.reduce((sum, v) => sum + v.totalVenta, 0);
-  const totalEnCaja = baseCaja + totalVentas;
+  // Obtener la fecha de hoy sin hora
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  // Filtrar ventas del día de hoy solo si el turno está abierto
+  const ventasAMostrar = turnoAbierto
+    ? ventas.filter((venta) => {
+        const ventaDate = new Date(venta.rawFecha);
+        return ventaDate >= todayStart && ventaDate <= todayEnd;
+      })
+    : [];
+
+  // Calcular total en caja: solo con ventas en efectivo del día
+  const totalVentasEfectivo = ventasAMostrar
+    .filter((v) => v.metodo_pago === 'efectivo')
+    .reduce((sum, v) => sum + v.totalVenta, 0);
+  const totalEnCaja = baseCaja + totalVentasEfectivo;
 
   return (
     <div>
@@ -181,10 +370,10 @@ export function Venta() {
             </div>
           </div>
           <div className="text-center bg-blue-50 border border-blue-200 rounded-lg px-2 py-2 sm:px-4 sm:py-3">
-            <p className="text-xs text-gray-600 mb-1">Ventas</p>
+            <p className="text-xs text-gray-600 mb-1">Ventas (Efectivo)</p>
             <div className="flex items-center justify-center gap-1">
               <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" />
-              <p className="text-sm sm:text-lg text-blue-600">{totalVentas.toFixed(0)}</p>
+              <p className="text-sm sm:text-lg text-blue-600">{totalVentasEfectivo.toFixed(0)}</p>
             </div>
           </div>
           <div className="text-center bg-green-50 border border-green-200 rounded-lg px-2 py-2 sm:px-4 sm:py-3">
@@ -235,52 +424,87 @@ export function Venta() {
               </tr>
             </thead>
             <tbody>
-              {ventas.length === 0 ? (
+              {ventasAMostrar.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center px-3 sm:px-6 py-8 sm:py-12 text-sm text-gray-500">
-                    No hay ventas registradas en este turno
+                    {turnoAbierto ? 'No hay ventas registradas para hoy' : 'El turno está cerrado'}
                   </td>
                 </tr>
               ) : (
-                ventas.map((venta) => (
-                  venta.items.map((item, itemIndex) => (
-                    <tr key={`${venta.id}-${itemIndex}`} className="border-b border-gray-100 hover:bg-gray-50">
+                ventasAMostrar.map((venta) => {
+                  if (venta.items.length > 0) {
+                    return venta.items.map((item, itemIndex) => (
+                      <tr key={`${venta.id}-${itemIndex}`} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-600">
+                          {itemIndex === 0 ? venta.fecha : ''}
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">{item.productoNombre}</td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-center text-gray-900">{item.cantidad}</td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
+                          ${item.precioUnitario.toFixed(0)}
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
+                          ${item.total.toFixed(0)}
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <div className="flex items-center justify-center gap-1 sm:gap-2">
+                            {itemIndex === 0 && (
+                              <>
+                                <button
+                                  onClick={() => openModal(venta)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteVenta(venta.id)}
+                                  className="p-2 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  }
+
+                  // ventas sin items (vienen del usuario) se muestran en una fila resumen
+                  return (
+                    <tr key={venta.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-600">
-                        {itemIndex === 0 ? venta.fecha : ''}
+                        {venta.fecha}
                       </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">{item.productoNombre}</td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-center text-gray-900">{item.cantidad}</td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">--</td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-center text-gray-900">-</td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">-</td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
-                        ${item.precioUnitario.toFixed(0)}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-right text-gray-900">
-                        ${item.total.toFixed(0)}
+                        ${venta.totalVenta.toFixed(0)}
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4">
                         <div className="flex items-center justify-center gap-1 sm:gap-2">
-                          {itemIndex === 0 && (
-                            <>
-                              <button
-                                onClick={() => openModal(venta)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
-                                title="Editar"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteVenta(venta.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => openModal(venta)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVenta(venta.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
-                  ))
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -401,22 +625,113 @@ export function Venta() {
                 <div className="border-t border-gray-200 pt-4">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Items agregados ({items.length})</h3>
                   <div className="space-y-2">
-                    {items.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900">{item.productoNombre}</div>
-                          <div className="text-xs text-gray-600">Cant: {item.cantidad} × ${item.precioUnitario.toFixed(0)} = ${item.total.toFixed(0)}</div>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveItem(index)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2"
-                          title="Eliminar item"
+                    {items.map((item, index) => 
+                      itemEditingIdx === index ? null : (
+                        <div
+                          key={index}
+                          onClick={() => openItemEditor(index)}
+                          className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100"
                         >
-                          <X className="w-4 h-4" />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">{item.productoNombre}</div>
+                            <div className="text-xs text-gray-600">Cant: {item.cantidad} × ${item.precioUnitario.toFixed(0)} = ${item.total.toFixed(0)}</div>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRemoveItem(index); }}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2"
+                            title="Eliminar item"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  {/* Inline item editor */}
+                  {itemEditingIdx !== null && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 space-y-4 mt-4">
+                      <div>
+                        <label className="block text-sm mb-2 text-gray-700">Buscar producto</label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          <input
+                            type="text"
+                            value={itemEditSearchTerm}
+                            onChange={(e) => setItemEditSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                            placeholder="Nombre o código..."
+                          />
+                        </div>
+                        {itemEditSearchTerm && (
+                          <div className="mt-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+                            {filteredProductos.filter(
+                              (p) =>
+                                p.nombre.toLowerCase().includes(itemEditSearchTerm.toLowerCase()) ||
+                                p.codigo.toLowerCase().includes(itemEditSearchTerm.toLowerCase())
+                            ).map((producto) => (
+                              <button
+                                key={producto.id}
+                                onClick={() => {
+                                  setItemEditSelectedProducto(producto);
+                                  setItemEditSearchTerm('');
+                                }}
+                                className="w-full p-3 text-left hover:bg-gray-100 border-b border-gray-300 last:border-b-0 transition-colors"
+                              >
+                                <div className="text-sm text-gray-900">{producto.nombre}</div>
+                                <div className="text-xs text-gray-600">
+                                  Código: {producto.codigo} - ${producto.precioVenta.toFixed(0)}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {itemEditSelectedProducto && (
+                        <div className="bg-white border border-indigo-200 rounded-lg p-3">
+                          <div className="text-sm text-gray-700 mb-1">Producto seleccionado:</div>
+                          <div className="text-gray-900">{itemEditSelectedProducto.nombre}</div>
+                          <div className="text-sm text-gray-600">
+                            Precio: ${itemEditSelectedProducto.precioVenta.toFixed(0)}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-sm mb-2 text-gray-700">Cantidad</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={itemEditCantidad}
+                          onChange={(e) => setItemEditCantidad(parseInt(e.target.value) || 1)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={closeItemEditor}
+                          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (itemEditingIdx === null) return;
+                            handleRemoveItem(itemEditingIdx);
+                            closeItemEditor();
+                          }}
+                          className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          Eliminar
+                        </button>
+                        <button
+                          onClick={saveItemEdit}
+                          className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                          Guardar
                         </button>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Total de la venta */}
                   <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
@@ -426,6 +741,19 @@ export function Venta() {
                         ${items.reduce((sum, item) => sum + item.total, 0).toFixed(0)}
                       </span>
                     </div>
+                  </div>
+
+                  {/* Método de pago */}
+                  <div>
+                    <label className="block text-sm mb-2 text-gray-700">Método de pago</label>
+                    <select
+                      value={metodoPago}
+                      onChange={(e) => setMetodoPago(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+                    >
+                      <option value="efectivo">Efectivo</option>
+                      <option value="nequi">Nequi</option>
+                    </select>
                   </div>
                 </div>
               )}

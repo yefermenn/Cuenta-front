@@ -9,8 +9,9 @@ export function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -24,8 +25,55 @@ export function Login({ onLogin }: LoginProps) {
       return;
     }
 
-    // Simulación de login
-    onLogin(email);
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:3000/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError((data && (data.message || data.error)) || 'Credenciales inválidas');
+        setLoading(false);
+        return;
+      }
+
+      const token = data?.access_token ?? data?.token ?? data?.jwt ?? data?.accessToken;
+      const user = data?.detail ?? data?.user ?? null;
+
+      if (!token) {
+        setError('No se recibió token del servidor');
+        setLoading(false);
+        return;
+      }
+
+      if (!user) {
+        setError('No se recibió información del usuario');
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem('jwt', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('userSession', JSON.stringify(user));
+      try {
+        localStorage.setItem('turnoAbierto', JSON.stringify(Boolean(user.shift)));
+      } catch {}
+      if (user.base !== undefined && user.base !== null) {
+        localStorage.setItem('baseCaja', String(user.base));
+      }
+
+      onLogin(email);
+    } catch (err) {
+      setError('Error de conexión con el servidor');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,9 +130,10 @@ export function Login({ onLogin }: LoginProps) {
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-medium"
+            disabled={loading}
+            className={`w-full py-3 rounded-lg transition-colors duration-200 font-medium ${loading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
           >
-            Iniciar sesión
+            {loading ? 'Ingresando...' : 'Iniciar sesión'}
           </button>
         </form>
       </div>
