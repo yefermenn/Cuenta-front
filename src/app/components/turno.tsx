@@ -34,7 +34,7 @@ export function Turno({ userName }: TurnoProps) {
     const userId = user?.id || user?.Id || user?.userId;
     if (!userId) throw new Error('ID de usuario no disponible');
 
-    const res = await fetch(`http://localhost:3000/users/${userId}`, {
+    const res = await fetch(`/api/users/${userId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

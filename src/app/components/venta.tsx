@@ -135,7 +135,7 @@ export function Venta() {
           }),
         };
 
-        const response = await fetch(`http://localhost:3000/sales/${editingVenta.id}`, {
+        const response = await fetch(`/api/sales/${editingVenta.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -182,7 +182,7 @@ export function Venta() {
           })),
         };
 
-        const response = await fetch('http://localhost:3000/sales', {
+        const response = await fetch('/api/sales', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -291,7 +291,7 @@ export function Venta() {
     if (!confirm('¿Está seguro de eliminar esta venta?')) return;
     try {
       const token = localStorage.getItem('jwt');
-      await fetch(`http://localhost:3000/sales/${id}`, {
+      await fetch(`/api/sales/${id}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

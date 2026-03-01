@@ -36,7 +36,7 @@ const SalesContext = createContext<SalesContextValue | undefined>(undefined);
 
 async function fetchSalesFromServer(): Promise<RawSale[]> {
   const token = localStorage.getItem('jwt');
-  const res = await fetch('http://localhost:3000/sales', {
+  const res = await fetch('/api/sales', {
     headers: token
       ? {
           Authorization: `Bearer ${token}`,

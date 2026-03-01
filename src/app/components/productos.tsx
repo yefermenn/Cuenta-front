@@ -122,7 +122,7 @@ export function Productos() {
             userId,
           };
 
-          const res = await fetch(`http://localhost:3000/products/${editingProducto.id}`, {
+          const res = await fetch(`/api/products/${editingProducto.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -200,7 +200,7 @@ export function Productos() {
           userId,
         };
 
-        const res = await fetch('http://localhost:3000/products', {
+        const res = await fetch('/api/products', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -244,7 +244,7 @@ export function Productos() {
       try {
         const token = localStorage.getItem('jwt');
         if (!token) throw new Error('No hay sesión activa');
-        const res = await fetch(`http://localhost:3000/products/${id}`, {
+        const res = await fetch(`/api/products/${id}`, {
           method: 'DELETE',
           headers: {
             Authorization: `Bearer ${token}`,
