@@ -83,7 +83,7 @@ export function Login({ onLogin }: LoginProps) {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-full mb-4">
             <IceCream className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl mb-2 text-gray-900">Heladería POS</h1>
+          <h1 className="text-3xl mb-2 text-gray-900">Cuenta</h1>
           <p className="text-gray-600">Ingrese sus credenciales para continuar</p>
         </div>
 

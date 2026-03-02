@@ -51,7 +51,7 @@ export function Sidebar({ activeModule, onModuleChange, onLogout, userName, isOp
                 <IceCream className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="font-semibold">Heladería POS</h2>
+                <h2 className="font-semibold">Cuenta</h2>
               </div>
             </div>
             {onClose && (
