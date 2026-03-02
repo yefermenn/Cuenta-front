@@ -34,7 +34,7 @@ export function Venta() {
   const [editingVenta, setEditingVenta] = useState<Venta | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
-  const [cantidad, setCantidad] = useState(1);
+  const [cantidad, setCantidad] = useState<number | string>('');
   const [turnoAbierto, setTurnoAbierto] = useState(false);
   const [baseCaja, setBaseCaja] = useState(0);
   const [items, setItems] = useState<ItemVenta[]>([]);
@@ -42,7 +42,7 @@ export function Venta() {
 
   // states for inline item editing
   const [itemEditingIdx, setItemEditingIdx] = useState<number | null>(null);
-  const [itemEditCantidad, setItemEditCantidad] = useState(1);
+  const [itemEditCantidad, setItemEditCantidad] = useState<number | string>('');
   const [itemEditSearchTerm, setItemEditSearchTerm] = useState('');
   const [itemEditSelectedProducto, setItemEditSelectedProducto] = useState<Producto | null>(null);
 
@@ -230,23 +230,29 @@ export function Venta() {
       return;
     }
 
-    if (cantidad < 1) {
+    const cantidadNum = parseInt(cantidad as string, 10);
+    if (!cantidad || cantidadNum === 0) {
+      alert('La cantidad no puede quedar en 0');
+      return;
+    }
+
+    if (cantidadNum < 1) {
       alert('La cantidad debe ser al menos 1');
       return;
     }
 
-    const total = selectedProducto.precioVenta * cantidad;
+    const total = selectedProducto.precioVenta * cantidadNum;
     const newItem: ItemVenta = {
       productoId: selectedProducto.id,
       productoNombre: selectedProducto.nombre,
-      cantidad,
+      cantidad: cantidadNum,
       precioUnitario: selectedProducto.precioVenta,
       total,
     };
 
     setItems([...items, newItem]);
     setSelectedProducto(null);
-    setCantidad(1);
+    setCantidad('');
     setSearchTerm('');
   };
 
@@ -257,7 +263,7 @@ export function Venta() {
   const openItemEditor = (index: number) => {
     const it = items[index];
     setItemEditingIdx(index);
-    setItemEditCantidad(it.cantidad);
+    setItemEditCantidad(it.cantidad.toString());
     setItemEditSearchTerm('');
     // preload producto for dropdown if exists
     const prod = productos.find((p) => p.id === it.productoId);
@@ -266,20 +272,32 @@ export function Venta() {
 
   const closeItemEditor = () => {
     setItemEditingIdx(null);
-    setItemEditCantidad(1);
+    setItemEditCantidad('');
     setItemEditSearchTerm('');
     setItemEditSelectedProducto(null);
   };
 
   const saveItemEdit = () => {
     if (itemEditingIdx === null) return;
+    
+    const cantidadNum = parseInt(itemEditCantidad as string, 10);
+    if (!itemEditCantidad || cantidadNum === 0) {
+      alert('La cantidad no puede quedar en 0');
+      return;
+    }
+
+    if (cantidadNum < 1) {
+      alert('La cantidad debe ser al menos 1');
+      return;
+    }
+
     const updated: ItemVenta = {
       ...items[itemEditingIdx],
-      cantidad: itemEditCantidad,
+      cantidad: cantidadNum,
       productoId: itemEditSelectedProducto ? itemEditSelectedProducto.id : items[itemEditingIdx].productoId,
       productoNombre: itemEditSelectedProducto ? itemEditSelectedProducto.nombre : items[itemEditingIdx].productoNombre,
       precioUnitario: itemEditSelectedProducto ? itemEditSelectedProducto.precioVenta : items[itemEditingIdx].precioUnitario,
-      total: (itemEditSelectedProducto ? itemEditSelectedProducto.precioVenta : items[itemEditingIdx].precioUnitario) * itemEditCantidad,
+      total: (itemEditSelectedProducto ? itemEditSelectedProducto.precioVenta : items[itemEditingIdx].precioUnitario) * cantidadNum,
     };
     const newItems = [...items];
     newItems[itemEditingIdx] = updated;
@@ -325,6 +343,7 @@ export function Venta() {
     setCantidad(1);
     setItems([]);
     setMetodoPago('efectivo');
+    setCantidad('');
   };
 
   const generateExcel = () => {
@@ -587,10 +606,10 @@ export function Venta() {
                   <label className="block text-sm mb-2 text-gray-700">Cantidad</label>
                   <input
                     type="number"
-                    min="1"
                     value={cantidad}
-                    onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                    onChange={(e) => setCantidad(e.target.value === '' ? '' : parseInt(e.target.value))}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    placeholder="Ingrese la cantidad"
                   />
                 </div>
               )}
@@ -609,12 +628,12 @@ export function Venta() {
               )}
 
               {/* Total del item actual */}
-              {selectedProducto && (
+              {selectedProducto && cantidad !== '' && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700">Subtotal item:</span>
                     <span className="text-xl text-indigo-600">
-                      ${(selectedProducto.precioVenta * cantidad).toFixed(0)}
+                      ${(selectedProducto.precioVenta * (cantidad as number)).toFixed(0)}
                     </span>
                   </div>
                 </div>
@@ -700,10 +719,10 @@ export function Venta() {
                         <label className="block text-sm mb-2 text-gray-700">Cantidad</label>
                         <input
                           type="number"
-                          min="1"
                           value={itemEditCantidad}
-                          onChange={(e) => setItemEditCantidad(parseInt(e.target.value) || 1)}
+                          onChange={(e) => setItemEditCantidad(e.target.value === '' ? '' : parseInt(e.target.value))}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                          placeholder="Ingrese la cantidad"
                         />
                       </div>
                       <div className="flex gap-2">
