@@ -7,6 +7,8 @@ import { Turno } from '@/app/components/turno';
 import { Venta } from '@/app/components/venta';
 import { Productos } from '@/app/components/productos';
 import { Cuentas } from '@/app/components/cuentas';
+import { hasValidSession, getCurrentUserName, logout } from '@/services/authService';
+import { onAuthStatusChange } from '@/services/apiClient';
 
 type Module = 'turno' | 'venta' | 'productos' | 'cuentas';
 
@@ -15,36 +17,52 @@ export default function App() {
   const [userName, setUserName] = useState('');
   const [activeModule, setActiveModule] = useState<Module>('turno');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
 
+  // Inicializar sesión al cargar la app
   useEffect(() => {
-    // Verificar si hay una sesión guardada
-    const savedSession = localStorage.getItem('userSession');
-    if (savedSession) {
-      const session = JSON.parse(savedSession);
-      setIsAuthenticated(true);
-      setUserName(session.nombre ?? session.name ?? session.email ?? '');
-    }
+    const initAuth = async () => {
+      try {
+        if (hasValidSession()) {
+          setIsAuthenticated(true);
+          const name = getCurrentUserName();
+          setUserName(name);
+        } else {
+          setIsAuthenticated(false);
+          setUserName('');
+        }
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
+  // Suscribirse a cambios de autenticación (ej: cuando el token expira)
+  useEffect(() => {
+    const unsubscribe = onAuthStatusChange((authenticated) => {
+      setIsAuthenticated(authenticated);
+      if (!authenticated) {
+        setUserName('');
+        setActiveModule('turno');
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   const handleLogin = (email: string) => {
     setIsAuthenticated(true);
-    const savedSession = localStorage.getItem('userSession');
-    if (savedSession) {
-      const session = JSON.parse(savedSession);
-      setUserName(session.nombre ?? session.name ?? session.email ?? email);
-    } else {
-      setUserName(email);
-      localStorage.setItem('userSession', JSON.stringify({ email }));
-    }
+    const name = getCurrentUserName();
+    setUserName(name || email);
   };
 
   const handleLogout = () => {
     if (confirm('¿Está seguro de cerrar sesión?')) {
+      logout();
       setIsAuthenticated(false);
       setUserName('');
-      localStorage.removeItem('userSession');
-      localStorage.removeItem('user');
-      localStorage.removeItem('jwt');
       setActiveModule('turno');
     }
   };
@@ -58,6 +76,18 @@ export default function App() {
     };
     return labels[activeModule];
   };
+
+  // Mostrar pantalla de carga mientras se verifica la sesión
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;

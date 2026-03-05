@@ -51,7 +51,7 @@ export function Venta() {
     const savedProductos = localStorage.getItem('productos');
     const savedTurno = localStorage.getItem('turnoAbierto');
     const savedBaseCaja = localStorage.getItem('baseCaja');
-    const savedUser = localStorage.getItem('user');
+    const savedUser = sessionStorage.getItem('user');
 
     // Cargar user info y mapear productos (ventas ahora vienen del SalesProvider)
     if (savedUser) {
@@ -102,8 +102,8 @@ export function Venta() {
     }
 
     try {
-      const savedUser = localStorage.getItem('user');
-      const token = localStorage.getItem('jwt');
+      const savedUser = sessionStorage.getItem('user');
+      const token = sessionStorage.getItem('jwt');
 
       if (!savedUser || !token) {
         alert('Error: Usuario no autenticado');
@@ -308,7 +308,7 @@ export function Venta() {
   const handleDeleteVenta = async (id: string) => {
     if (!confirm('¿Está seguro de eliminar esta venta?')) return;
     try {
-      const token = localStorage.getItem('jwt');
+      const token = sessionStorage.getItem('jwt');
       await fetch(`/api/sales/${id}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},

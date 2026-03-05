@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Mail, Lock, IceCream } from 'lucide-react';
+import { login } from '@/services/authService';
 
 interface LoginProps {
   onLogin: (email: string) => void;
@@ -27,45 +28,11 @@ export function Login({ onLogin }: LoginProps) {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const result = await login({ email, password });
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError((data && (data.message || data.error)) || 'Credenciales inválidas');
-        setLoading(false);
+      if (!result.success) {
+        setError(result.error || 'Error desconocido');
         return;
-      }
-
-      const token = data?.access_token ?? data?.token ?? data?.jwt ?? data?.accessToken;
-      const user = data?.detail ?? data?.user ?? null;
-
-      if (!token) {
-        setError('No se recibió token del servidor');
-        setLoading(false);
-        return;
-      }
-
-      if (!user) {
-        setError('No se recibió información del usuario');
-        setLoading(false);
-        return;
-      }
-
-      localStorage.setItem('jwt', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('userSession', JSON.stringify(user));
-      try {
-        localStorage.setItem('turnoAbierto', JSON.stringify(Boolean(user.shift)));
-      } catch {}
-      if (user.base !== undefined && user.base !== null) {
-        localStorage.setItem('baseCaja', String(user.base));
       }
 
       onLogin(email);

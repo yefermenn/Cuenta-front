@@ -21,8 +21,8 @@ export function Productos() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Priorizar productos que vienen en la sesión (`localStorage.user`)
-    const rawUser = localStorage.getItem('user');
+    // Priorizar productos que vienen en la sesión (`sessionStorage.user`)
+    const rawUser = sessionStorage.getItem('user');
     if (rawUser) {
       try {
         const user = JSON.parse(rawUser);
@@ -97,8 +97,8 @@ export function Productos() {
       (async () => {
         setSaving(true);
         try {
-          const rawUser = localStorage.getItem('user');
-          const token = localStorage.getItem('jwt');
+          const rawUser = sessionStorage.getItem('user');
+          const token = sessionStorage.getItem('jwt');
           if (!rawUser || !token) throw new Error('No hay sesión activa');
           const user = JSON.parse(rawUser);
           const userId = user?.id || user?.Id || user?.userId;
@@ -144,13 +144,13 @@ export function Productos() {
 
           // actualizar user.products si existe
           try {
-            const rawUser2 = localStorage.getItem('user');
+            const rawUser2 = sessionStorage.getItem('user');
             if (rawUser2) {
               const u = JSON.parse(rawUser2);
               if (Array.isArray(u.products)) {
                 u.products = u.products.map((p: any) => (String(p.id) === String(editingProducto.id) ? { ...p, nombre: toUpdate.nombre, codigo: toUpdate.codigo, precioCompra: toUpdate.precioCompra, precioVenta: toUpdate.precioVenta, inventario: Number(inventario) } : p));
-                localStorage.setItem('user', JSON.stringify(u));
-                localStorage.setItem('userSession', JSON.stringify(u));
+                sessionStorage.setItem('user', JSON.stringify(u));
+                sessionStorage.setItem('userSession', JSON.stringify(u));
               }
             }
           } catch {}
@@ -169,8 +169,8 @@ export function Productos() {
     (async () => {
       setSaving(true);
       try {
-        const rawUser = localStorage.getItem('user');
-        const token = localStorage.getItem('jwt');
+        const rawUser = sessionStorage.getItem('user');
+        const token = sessionStorage.getItem('jwt');
         if (!rawUser || !token) throw new Error('No hay sesión activa');
         const user = JSON.parse(rawUser);
         const userId = user?.id || user?.Id || user?.userId;
@@ -233,7 +233,7 @@ export function Productos() {
     }
     (async () => {
       try {
-        const token = localStorage.getItem('jwt');
+        const token = sessionStorage.getItem('jwt');
         if (!token) throw new Error('No hay sesión activa');
         const res = await fetch(`/api/products/${id}`, {
           method: 'DELETE',
@@ -251,13 +251,13 @@ export function Productos() {
         localStorage.setItem('productos', JSON.stringify(updatedProductos));
         // también actualizar en user.products si existe
         try {
-          const rawUser = localStorage.getItem('user');
+          const rawUser = sessionStorage.getItem('user');
           if (rawUser) {
             const u = JSON.parse(rawUser);
             if (Array.isArray(u.products)) {
               u.products = u.products.filter((p: any) => String(p.id) !== String(id));
-              localStorage.setItem('user', JSON.stringify(u));
-              localStorage.setItem('userSession', JSON.stringify(u));
+              sessionStorage.setItem('user', JSON.stringify(u));
+              sessionStorage.setItem('userSession', JSON.stringify(u));
             }
           }
         } catch {}

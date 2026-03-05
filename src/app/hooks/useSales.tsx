@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { apiGet } from '@/services/apiClient';
 
 interface SaleDetail {
   id: string;
@@ -35,20 +36,13 @@ interface SalesContextValue {
 const SalesContext = createContext<SalesContextValue | undefined>(undefined);
 
 async function fetchSalesFromServer(): Promise<RawSale[]> {
-  const token = localStorage.getItem('jwt');
-  const res = await fetch('/api/sales', {
-    headers: token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {},
-  });
+  const res = await apiGet('/api/sales');
   if (!res.ok) throw new Error('Error fetching sales');
   return res.json();
 }
 
 function mapRawToVentas(raw: RawSale[]): Venta[] {
-  const savedUser = localStorage.getItem('user');
+  const savedUser = sessionStorage.getItem('user');
   let products: any[] = [];
   if (savedUser) {
     try {

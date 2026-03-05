@@ -27,8 +27,8 @@ export function Turno({ userName }: TurnoProps) {
     }
   }, []);
   const patchUser = async (payload: { shift?: boolean; base?: number }) => {
-    const rawUser = localStorage.getItem('user');
-    const token = localStorage.getItem('jwt');
+    const rawUser = sessionStorage.getItem('user');
+    const token = sessionStorage.getItem('jwt');
     if (!rawUser || !token) throw new Error('No hay sesión activa');
     const user = JSON.parse(rawUser);
     const userId = user?.id || user?.Id || user?.userId;
