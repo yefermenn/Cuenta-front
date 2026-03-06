@@ -75,15 +75,40 @@ export async function login(credentials: LoginCredentials): Promise<{
     sessionStorage.setItem('user', JSON.stringify(user));
     sessionStorage.setItem('userSession', JSON.stringify(user));
 
-    // Guardar datos adicionales en localStorage si es necesario
+    // Guardar datos sincronizados del servidor
+    // Esto asegura que cada dispositivo tenga los datos actualizados desde el backend
     try {
+      // Guardar estado del turno
       sessionStorage.setItem('turnoAbierto', JSON.stringify(Boolean(user.shift)));
+      localStorage.setItem('turnoAbierto', JSON.stringify(Boolean(user.shift)));
     } catch (e) {
       console.warn('Error guardando turnoAbierto:', e);
     }
 
+    // Guardar base de caja
     if (user.base !== undefined && user.base !== null) {
       sessionStorage.setItem('baseCaja', String(user.base));
+      localStorage.setItem('baseCaja', String(user.base));
+    }
+
+    // Guardar productos sincronizados desde el servidor
+    if (Array.isArray(user.products) && user.products.length > 0) {
+      const productos = user.products.map((p: any) => ({
+        id: String(p.id),
+        nombre: p.nombre,
+        codigo: String(p.codigo),
+        precioCompra: Number(p.precioCompra),
+        precioVenta: Number(p.precioVenta),
+        inventario: Number(p.inventario ?? 0),
+      }));
+      sessionStorage.setItem('productos', JSON.stringify(productos));
+      localStorage.setItem('productos', JSON.stringify(productos));
+    }
+
+    // Guardar ventas sincronizadas desde el servidor
+    if (Array.isArray(user.sales) && user.sales.length > 0) {
+      sessionStorage.setItem('ventas', JSON.stringify(user.sales));
+      localStorage.setItem('ventas', JSON.stringify(user.sales));
     }
 
     return {
@@ -108,6 +133,8 @@ export function logout(): void {
   sessionStorage.removeItem('userSession');
   sessionStorage.removeItem('turnoAbierto');
   sessionStorage.removeItem('baseCaja');
+  sessionStorage.removeItem('productos');
+  sessionStorage.removeItem('ventas');
 }
 
 /**

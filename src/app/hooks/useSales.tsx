@@ -89,20 +89,27 @@ export function SalesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    // fetch once on mount
-    (async () => {
-      if (!mounted) return;
-      await refreshSales();
-    })();
+    
+    // Cargar datos iniciales desde sessionStorage (del login)
+    const loadInitialData = () => {
+      try {
+        const ventasStored = sessionStorage.getItem('ventas');
+        if (ventasStored) {
+          const salesData = JSON.parse(ventasStored);
+          const mapped = mapRawToVentas(salesData as RawSale[]);
+          setVentas(mapped);
+        }
+      } catch (e) {
+        console.warn('Error cargando ventas del sessionStorage:', e);
+      }
+    };
 
-    // Poll every 5s
-    const id = setInterval(() => {
-      refreshSales();
-    }, 5000);
+    if (mounted) {
+      loadInitialData();
+    }
 
     return () => {
       mounted = false;
-      clearInterval(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
