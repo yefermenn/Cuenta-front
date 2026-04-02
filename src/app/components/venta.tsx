@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSales } from '../hooks/useSales';
-import { Plus, FileSpreadsheet, Edit, Trash2, Search, X, DollarSign } from 'lucide-react';
+import { Plus, FileSpreadsheet, Edit, Trash2, Search, X, DollarSign, Loader2 } from 'lucide-react';
 
 interface Producto {
   id: string;
@@ -39,6 +39,7 @@ export function Venta() {
   const [baseCaja, setBaseCaja] = useState(0);
   const [items, setItems] = useState<ItemVenta[]>([]);
   const [metodoPago, setMetodoPago] = useState('efectivo');
+  const [isLoading, setIsLoading] = useState(false);
 
   // states for inline item editing
   const [itemEditingIdx, setItemEditingIdx] = useState<number | null>(null);
@@ -100,6 +101,8 @@ export function Venta() {
       alert('Por favor agregue al menos un producto');
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const savedUser = sessionStorage.getItem('user');
@@ -170,6 +173,7 @@ export function Venta() {
 
         await refreshSales();
         alert('Venta actualizada correctamente');
+        setIsLoading(false);
         closeModal();
       } else {
         // Si es nueva venta, hacer POST
@@ -217,9 +221,11 @@ export function Venta() {
 
         await refreshSales();
         alert('Venta guardada correctamente');
+        setIsLoading(false);
         closeModal();
       }
     } catch (error) {
+      setIsLoading(false);
       alert(`Error: ${error instanceof Error ? error.message : 'Error desconocido al guardar la venta'}`);
     }
   };
@@ -787,10 +793,17 @@ export function Venta() {
               </button>
               <button
                 onClick={handleSaveVenta}
-                disabled={items.length === 0}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={items.length === 0 || isLoading}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Guardar venta
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Guardar venta'
+                )}
               </button>
             </div>
           </div>
